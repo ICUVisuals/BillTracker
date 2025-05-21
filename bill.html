@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bill Tracker</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+        body {
+            background-color: #f0f9ff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .bill-card {
+            transition: all 0.3s ease;
+        }
+        .bill-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .category-badge {
+            transition: all 0.2s ease;
+        }
+        .category-badge:hover {
+            transform: scale(1.05);
+        }
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-paid {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: rgb(16, 185, 129);
+        }
+        .status-unpaid {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: rgb(239, 68, 68);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            max-width: 800px;
+            width: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            position: relative;
+        }
+        .close {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .month-selector {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            transition: all 0.2s ease;
+        }
+        .month-selector:hover {
+            background-color: #e0f2fe;
+        }
+        .month-selector.active {
+            background-color: #0284c7;
+            color: white;
+        }
+        .calendar-day {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .calendar-day:hover {
+            background-color: #e0f2fe;
+        }
+        .calendar-day.has-bill {
+            font-weight: 600;
+        }
+        .calendar-day.has-bill::after {
+            content: '';
+            position: absolute;
+            bottom: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+        .calendar-day.has-unpaid-bill::after {
+            background-color: #ef4444;
+        }
+        .calendar-day.has-paid-bill::after {
+            background-color: #10b981;
+        }
+        .calendar-day.has-mixed-bills::after {
+            background: linear-gradient(90deg, #ef4444 50%, #10b981 50%);
+        }
+        .calendar-day.has-due-soon-bill::after {
+            background-color: #f59e0b;
+        }
+        .calendar-day.selected {
+            background-color: #0284c7;
+            color: white;
+            font-weight: 600;
+        }
+        .calendar-day.today {
+            border: 2px solid #0284c7;
+        }
+        .calendar-view {
+            display: none;
+        }
+        .action-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .due-date-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            background-color: #e0f2fe;
+            color: #0284c7;
+            border-left: 4px solid #0284c7;
+            font-size: 1rem;
+            height: 36px;
+        }
+        .due-date-badge.overdue {
+            background-color: #fee2e2;
+            color: #ef4444;
+            border-left: 4px solid #ef4444;
+        }
+        .due-date-badge.due-soon {
+            background-color: #fef3c7;
+            color: #d97706;
+            border-left: 4px solid #d97706;
+        }
+        .due-date-badge.paid {
+            background-color: #d1fae5;
+            color: #10b981;
+            border-left: 4px solid #10b981;
+        }
+        .meta-info {
+            display: inline-block;
+            margin-right: 16px;
+            font-size: 0.85rem;
+        }
+        .custom-category-input {
+            display: none;
+        }
+        .bill-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .bill-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .bill-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #f3f4f6;
+        }
+        .bill-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #1f2937;
+        }
+        .bill-amount {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #1f2937;
+            text-align: right;
+        }
+        .bill-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .bill-action-btn {
+            font-size: 0.8rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .reminder-icon {
+            display: inline-flex;
+            margin-left: 4px;
+            padding: 1px 4px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background-color: #fef3c7;
+            color: #d97706;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+        .calendar-legend {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 12px;
+            font-size: 0.8rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .bill-notes {
+            display: inline-block;
+            font-size: 0.85rem;
+            color: rgb(107 114 128 / 1);
+        }
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 9999;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform: translateY(20px);
+            opacity: 0;
+        }
+    </style>
+<style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.16 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.container{width:100%}@media (min-width: 640px){.container{max-width:640px}}@media (min-width: 768px){.container{max-width:768px}}@media (min-width: 1024px){.container{max-width:1024px}}@media (min-width: 1280px){.container{max-width:1280px}}@media (min-width: 1536px){.container{max-width:1536px}}.fixed{position:fixed}.inset-0{inset:0px}.z-50{z-index:50}.mx-auto{margin-left:auto;margin-right:auto}.mx-4{margin-left:1rem;margin-right:1rem}.mb-2{margin-bottom:0.5rem}.mb-4{margin-bottom:1rem}.mb-8{margin-bottom:2rem}.mr-1{margin-right:0.25rem}.mt-2{margin-top:0.5rem}.mb-1{margin-bottom:0.25rem}.mb-6{margin-bottom:1.5rem}.mr-2{margin-right:0.5rem}.block{display:block}.flex{display:flex}.grid{display:grid}.hidden{display:none}.h-5{height:1.25rem}.w-5{width:1.25rem}.w-full{width:100%}.max-w-5xl{max-width:64rem}.max-w-md{max-width:28rem}.translate-y-20{--tw-translate-y:5rem;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.transform{transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.grid-cols-1{grid-template-columns:repeat(1, minmax(0, 1fr))}.grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}.grid-cols-7{grid-template-columns:repeat(7, minmax(0, 1fr))}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.justify-end{justify-content:flex-end}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1{gap:0.25rem}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.gap-6{gap:1.5rem}.gap-4{gap:1rem}.space-x-2 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.5rem * var(--tw-space-x-reverse));margin-left:calc(0.5rem * calc(1 - var(--tw-space-x-reverse)))}.space-x-3 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.75rem * var(--tw-space-x-reverse));margin-left:calc(0.75rem * calc(1 - var(--tw-space-x-reverse)))}.space-y-3 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.75rem * var(--tw-space-y-reverse))}.space-y-4 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.rounded-lg{border-radius:0.5rem}.rounded-md{border-radius:0.375rem}.rounded-xl{border-radius:0.75rem}.border{border-width:1px}.border-l-4{border-left-width:4px}.border-blue-500{--tw-border-opacity:1;border-color:rgb(59 130 246 / var(--tw-border-opacity, 1))}.border-gray-300{--tw-border-opacity:1;border-color:rgb(209 213 219 / var(--tw-border-opacity, 1))}.border-green-500{--tw-border-opacity:1;border-color:rgb(34 197 94 / var(--tw-border-opacity, 1))}.border-red-500{--tw-border-opacity:1;border-color:rgb(239 68 68 / var(--tw-border-opacity, 1))}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235 / var(--tw-bg-opacity, 1))}.bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246 / var(--tw-bg-opacity, 1))}.bg-green-600{--tw-bg-opacity:1;background-color:rgb(22 163 74 / var(--tw-bg-opacity, 1))}.bg-purple-600{--tw-bg-opacity:1;background-color:rgb(147 51 234 / var(--tw-bg-opacity, 1))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.bg-black{--tw-bg-opacity:1;background-color:rgb(0 0 0 / var(--tw-bg-opacity, 1))}.bg-gray-800{--tw-bg-opacity:1;background-color:rgb(31 41 55 / var(--tw-bg-opacity, 1))}.bg-red-600{--tw-bg-opacity:1;background-color:rgb(220 38 38 / var(--tw-bg-opacity, 1))}.bg-opacity-50{--tw-bg-opacity:0.5}.bg-gradient-to-r{background-image:linear-gradient(to right, var(--tw-gradient-stops))}.from-blue-600{--tw-gradient-from:#2563eb var(--tw-gradient-from-position);--tw-gradient-to:rgb(37 99 235 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to)}.to-indigo-700{--tw-gradient-to:#4338ca var(--tw-gradient-to-position)}.p-4{padding:1rem}.p-5{padding:1.25rem}.p-6{padding:1.5rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.px-4{padding-left:1rem;padding-right:1rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-8{padding-top:2rem;padding-bottom:2rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.py-4{padding-top:1rem;padding-bottom:1rem}.text-center{text-align:center}.text-right{text-align:right}.text-2xl{font-size:1.5rem;line-height:2rem}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-semibold{font-weight:600}.text-blue-100{--tw-text-opacity:1;color:rgb(219 234 254 / var(--tw-text-opacity, 1))}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128 / var(--tw-text-opacity, 1))}.text-gray-800{--tw-text-opacity:1;color:rgb(31 41 55 / var(--tw-text-opacity, 1))}.text-gray-900{--tw-text-opacity:1;color:rgb(17 24 39 / var(--tw-text-opacity, 1))}.text-green-200{--tw-text-opacity:1;color:rgb(187 247 208 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81 / var(--tw-text-opacity, 1))}.opacity-0{opacity:0}.shadow-lg{--tw-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-md{--tw-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 4px 6px -1px var(--tw-shadow-color), 0 2px 4px -2px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.transition{transition-property:color, background-color, border-color, fill, stroke, opacity, box-shadow, transform, filter, -webkit-text-decoration-color, -webkit-backdrop-filter;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter, -webkit-text-decoration-color, -webkit-backdrop-filter;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.duration-300{transition-duration:300ms}.ease-in-out{transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1)}.hover\:scale-105:hover{--tw-scale-x:1.05;--tw-scale-y:1.05;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.hover\:bg-blue-700:hover{--tw-bg-opacity:1;background-color:rgb(29 78 216 / var(--tw-bg-opacity, 1))}.hover\:bg-gray-200:hover{--tw-bg-opacity:1;background-color:rgb(229 231 235 / var(--tw-bg-opacity, 1))}.hover\:bg-green-700:hover{--tw-bg-opacity:1;background-color:rgb(21 128 61 / var(--tw-bg-opacity, 1))}.hover\:bg-purple-700:hover{--tw-bg-opacity:1;background-color:rgb(126 34 206 / var(--tw-bg-opacity, 1))}.hover\:bg-gray-100:hover{--tw-bg-opacity:1;background-color:rgb(243 244 246 / var(--tw-bg-opacity, 1))}.hover\:bg-red-700:hover{--tw-bg-opacity:1;background-color:rgb(185 28 28 / var(--tw-bg-opacity, 1))}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)}.focus\:ring-blue-500:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(59 130 246 / var(--tw-ring-opacity, 1))}.focus\:ring-opacity-50:focus{--tw-ring-opacity:0.5}@media (min-width: 768px){.md\:grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}.md\:grid-cols-6{grid-template-columns:repeat(6, minmax(0, 1fr))}.md\:grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}}</style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg shadow-lg p-6 mb-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-white mb-2">Bill Tracker</h1>
+                    <p class="text-blue-100">Keep track of your bills and payments</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-white text-lg font-semibold">Total Due This Month: <span id="total-due-month">$0.00</span></div>
+                    <div class="text-green-200 text-lg font-semibold">Paid: <span id="total-paid-month">$0.00</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Year and Month Selection -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">2025</h2>
+            <div class="grid grid-cols-3 md:grid-cols-6 gap-2">
+                <div class="month-selector text-center" data-month="0">January</div>
+                <div class="month-selector text-center" data-month="1">February</div>
+                <div class="month-selector text-center" data-month="2">March</div>
+                <div class="month-selector text-center" data-month="3">April</div>
+                <div class="month-selector text-center active" data-month="4">May</div>
+                <div class="month-selector text-center" data-month="5">June</div>
+                <div class="month-selector text-center" data-month="6">July</div>
+                <div class="month-selector text-center" data-month="7">August</div>
+                <div class="month-selector text-center" data-month="8">September</div>
+                <div class="month-selector text-center" data-month="9">October</div>
+                <div class="month-selector text-center" data-month="10">November</div>
+                <div class="month-selector text-center" data-month="11">December</div>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-red-500">
+                <h3 class="text-gray-500 text-sm font-medium">Total Bills</h3>
+                <div class="flex items-center mt-2">
+                    <div class="text-2xl font-bold text-gray-900">$<span id="total-amount">0.00</span></div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-blue-500">
+                <h3 class="text-gray-500 text-sm font-medium">Unpaid Bills</h3>
+                <div class="flex items-center mt-2">
+                    <div class="text-2xl font-bold text-gray-900">$<span id="unpaid-amount">0.00</span></div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-5 border-l-4 border-green-500">
+                <h3 class="text-gray-500 text-sm font-medium">Total Entries</h3>
+                <div class="flex items-center mt-2">
+                    <div class="text-2xl font-bold text-gray-900"><span id="total-entries">0</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons Bar -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4 flex flex-wrap gap-3 justify-between items-center">
+            <div class="flex flex-wrap gap-3">
+                <button id="add-bill-btn" class="action-button bg-blue-600 hover:bg-blue-700 text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    Add Bill
+                </button>
+                <button id="copy-previous-month-btn" class="action-button bg-purple-600 hover:bg-purple-700 text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"></path>
+                        <path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"></path>
+                    </svg>
+                    Copy from Previous Month
+                </button>
+                <button id="toggle-calendar-btn" class="action-button bg-green-600 hover:bg-green-700 text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path>
+                    </svg>
+                    Calendar View
+                </button>
+            </div>
+            <div class="flex space-x-2">
+                <select id="filter-category" class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="all">All Categories</option>
+                    <option value="Housing">Housing</option>
+                    <option value="Credit Card">Credit Card</option>
+                    <option value="Medical">Medical</option>
+                    <option value="Productivity">Productivity</option>
+                    <option value="Digital Storage">Digital Storage</option>
+                    <option value="Insurance">Insurance</option>
+                    <option value="Utilities-Internet">Utilities-Internet</option>
+                    <option value="Credit">Credit</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Utilities-Phone">Utilities-Phone</option>
+                    <option value="Debt">Debt</option>
+                    <option value="Food">Food</option>
+                    <option value="Transportation">Transportation</option>
+                    <option value="Subscriptions">Subscriptions</option>
+                    <option value="Education">Education</option>
+                    <option value="Childcare">Childcare</option>
+                    <option value="Other">Other</option>
+                </select>
+                <select id="filter-status" class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="all">All Status</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Unpaid">Unpaid</option>
+                </select>
+                <button id="sort-amount" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-sm transition duration-300 ease-in-out">
+                    Sort by Amount
+                </button>
+                <button id="sort-date" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-sm transition duration-300 ease-in-out">
+                    Sort by Date
+                </button>
+            </div>
+        </div>
+
+        <!-- Calendar View (Hidden by Default) -->
+        <div id="calendar-view" class="calendar-view bg-white rounded-lg shadow-md p-6 mb-8" style="display: none;">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-800" id="calendar-month-year">January 2025</h2>
+            </div>
+            
+            <div class="mb-4">
+                <div class="grid grid-cols-7 gap-1 text-center mb-2">
+                    <div class="text-gray-500 font-medium">Sun</div>
+                    <div class="text-gray-500 font-medium">Mon</div>
+                    <div class="text-gray-500 font-medium">Tue</div>
+                    <div class="text-gray-500 font-medium">Wed</div>
+                    <div class="text-gray-500 font-medium">Thu</div>
+                    <div class="text-gray-500 font-medium">Fri</div>
+                    <div class="text-gray-500 font-medium">Sat</div>
+                </div>
+                <div id="calendar-days" class="grid grid-cols-7 gap-1">
+                    <!-- Calendar days will be generated here -->
+                </div>
+            </div>
+            
+            <div class="calendar-legend">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background-color: #ef4444;"></div>
+                    <span>Unpaid</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background-color: #10b981;"></div>
+                    <span>Paid</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background-color: #f59e0b;"></div>
+                    <span>Due Soon</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bills List -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-6">Bill History</h2>
+            
+            <div id="bills-container" class="space-y-3"><div class="text-center text-gray-500 py-8" id="no-bills-message" style="display: block;">
+                    No bills added yet. Click "+ Add Bill" to get started!
+                </div></div>
+        </div>
+    </div>
+
+    <!-- Add Bill Modal -->
+    <div id="add-bill-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">×</span>
+            <h2 class="text-xl font-semibold text-gray-800 mb-4" id="modal-title">Add New Bill</h2>
+            <form id="bill-form" class="space-y-4">
+                <input type="hidden" id="bill-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="bill-name" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <input type="text" id="bill-name" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., Electricity Bill" required="">
+                    </div>
+                    <div>
+                        <label for="bill-category" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <select id="bill-category" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required="">
+                            <option value="">Select a category</option>
+                            <option value="Housing">Housing</option>
+                            <option value="Credit Card">Credit Card</option>
+                            <option value="Medical">Medical</option>
+                            <option value="Productivity">Productivity</option>
+                            <option value="Digital Storage">Digital Storage</option>
+                            <option value="Insurance">Insurance</option>
+                            <option value="Utilities-Internet">Utilities-Internet</option>
+                            <option value="Credit">Credit</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Utilities-Phone">Utilities-Phone</option>
+                            <option value="Debt">Debt</option>
+                            <option value="Food">Food</option>
+                            <option value="Transportation">Transportation</option>
+                            <option value="Subscriptions">Subscriptions</option>
+                            <option value="Education">Education</option>
+                            <option value="Childcare">Childcare</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <input type="text" id="custom-category" class="custom-category-input w-full mt-2 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter custom category">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="bill-due-date" class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                        <input type="date" id="bill-due-date" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required="">
+                    </div>
+                    <div>
+                        <label for="bill-account-owner" class="block text-sm font-medium text-gray-700 mb-1">Account Owner</label>
+                        <input type="text" id="bill-account-owner" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., John Doe">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="bill-amount-before-tax" class="block text-sm font-medium text-gray-700 mb-1">Amount Before Tax ($)</label>
+                        <input type="number" id="bill-amount-before-tax" min="0" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00">
+                    </div>
+                    <div>
+                        <label for="bill-total-due" class="block text-sm font-medium text-gray-700 mb-1">Total Due ($)</label>
+                        <input type="number" id="bill-total-due" min="0" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00" required="">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="bill-card-digits" class="block text-sm font-medium text-gray-700 mb-1">Card Last 4 Digits</label>
+                        <input type="text" id="bill-card-digits" maxlength="4" pattern="[0-9]{4}" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., 1234">
+                    </div>
+                    <div>
+                        <label for="bill-status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select id="bill-status" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required="">
+                            <option value="Unpaid">Unpaid</option>
+                            <option value="Paid">Paid</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label for="bill-notes" class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                    <textarea id="bill-notes" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" rows="2" placeholder="Add any additional details..."></textarea>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" id="save-bill-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                        Add Bill
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="bg-red-600 text-white px-6 py-4">
+                <h3 class="text-xl font-semibold">Confirm Action</h3>
+            </div>
+            <div class="p-6">
+                <p id="confirm-message" class="text-gray-700 mb-6">Are you sure you want to delete this bill?</p>
+                <div class="flex justify-end space-x-3">
+                    <button id="cancel-confirm" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100">
+                        Cancel
+                    </button>
+                    <button id="confirm-action" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="bg-gray-800 text-white translate-y-20 opacity-0">
+        <i id="toast-icon" class="fas fa-check-circle mr-2"></i>
+        <span id="toast-message">Bill deleted successfully</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize bills array from localStorage or empty array
+            let bills = JSON.parse(localStorage.getItem('bills')) || [];
+            
+            // Set current date and selected month/year
+            const today = new Date();
+            let selectedMonth = today.getMonth();
+            let selectedYear = 2025; // Default to 2025
+            let selectedDate = null;
+            let isEditMode = false;
+            
+            // State object for callbacks
+            const state = {
+                billToDeleteId: null
+            };
+            
+            // Initialize modal elements
+            const modal = document.getElementById('add-bill-modal');
+            const confirmModal = document.getElementById('confirm-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const addBillBtn = document.getElementById('add-bill-btn');
+            const saveBillBtn = document.getElementById('save-bill-btn');
+            const closeBtn = document.querySelector('.close');
+            const calendarView = document.getElementById('calendar-view');
+            const toggleCalendarBtn = document.getElementById('toggle-calendar-btn');
+            const copyPreviousMonthBtn = document.getElementById('copy-previous-month-btn');
+            const billCategory = document.getElementById('bill-category');
+            const customCategory = document.getElementById('custom-category');
+            
+            // Show/hide custom category input when "Other" is selected
+            billCategory.addEventListener('change', function() {
+                if (this.value === 'Other') {
+                    customCategory.style.display = 'block';
+                    customCategory.required = true;
+                } else {
+                    customCategory.style.display = 'none';
+                    customCategory.required = false;
+                }
+            });
+            
+            // Open modal when add bill button is clicked
+            addBillBtn.addEventListener('click', function() {
+                isEditMode = false;
+                modalTitle.textContent = 'Add New Bill';
+                saveBillBtn.textContent = 'Add Bill';
+                document.getElementById('bill-id').value = '';
+                document.getElementById('bill-form').reset();
+                
+                // Set the due date to current month in 2025
+                const dueDate = new Date(2025, selectedMonth, 15);
+                document.getElementById('bill-due-date').value = formatDateForInput(dueDate);
+                
+                // Hide custom category input
+                customCategory.style.display = 'none';
+                
+                modal.style.display = 'block';
+            });
+            
+            // Close modal when X is clicked
+            closeBtn.addEventListener('click', function() {
+                closeModal();
+            });
+            
+            // Close modal when clicking outside of it - ONLY for the add bill modal, NOT for confirm modal
+            window.addEventListener('click', function(event) {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+            
+            // Function to close the modal
+            function closeModal() {
+                modal.style.display = 'none';
+                document.getElementById('bill-form').reset();
+            }
+            
+            // Cancel delete confirmation
+            document.getElementById('cancel-confirm').addEventListener('click', function() {
+                confirmModal.classList.add('hidden');
+                state.billToDeleteId = null;
+            });
+            
+            // Confirm delete action
+            document.getElementById('confirm-action').addEventListener('click', function() {
+                if (state.billToDeleteId) {
+                    // Store the bill ID to delete
+                    const billId = state.billToDeleteId;
+                    
+                    // First, hide the modal immediately
+                    confirmModal.classList.add('hidden');
+                    
+                    // Then perform the deletion
+                    const billIndex = bills.findIndex(bill => bill.id === billId);
+                    
+                    if (billIndex !== -1) {
+                        bills.splice(billIndex, 1);
+                        localStorage.setItem('bills', JSON.stringify(bills));
+                        updateUI();
+                        
+                        // Update calendar if it's visible
+                        if (calendarView.style.display === 'block') {
+                            updateCalendar();
+                        }
+                        
+                        showToast('Bill deleted successfully');
+                    }
+                    
+                    // Clear the state
+                    state.billToDeleteId = null;
+                }
+            });
+            
+            // Toggle calendar view
+            toggleCalendarBtn.addEventListener('click', function() {
+                if (calendarView.style.display === 'block') {
+                    calendarView.style.display = 'none';
+                } else {
+                    calendarView.style.display = 'block';
+                    updateCalendar();
+                }
+            });
+            
+            // Copy from previous month
+            copyPreviousMonthBtn.addEventListener('click', function() {
+                // Get previous month
+                let prevMonth = selectedMonth - 1;
+                let prevYear = selectedYear;
+                if (prevMonth < 0) {
+                    prevMonth = 11;
+                    prevYear--;
+                }
+                
+                // Get bills from previous month
+                const prevMonthBills = bills.filter(bill => {
+                    const billDate = new Date(bill.dueDate);
+                    return billDate.getMonth() === prevMonth && billDate.getFullYear() === prevYear;
+                });
+                
+                if (prevMonthBills.length === 0) {
+                    showToast('No bills found in the previous month to copy.', 'error');
+                    return;
+                }
+                
+                // Show confirmation modal
+                document.getElementById('confirm-message').textContent = `Copy all expenses from ${getMonthName(prevMonth)}?`;
+                document.getElementById('confirm-action').onclick = function() {
+                    // First hide the modal
+                    confirmModal.classList.add('hidden');
+                    // Then copy the bills
+                    copyFromPreviousMonth();
+                };
+                confirmModal.classList.remove('hidden');
+            });
+            
+            // Function to copy from previous month
+            function copyFromPreviousMonth() {
+                // Get previous month
+                let prevMonth = selectedMonth - 1;
+                let prevYear = selectedYear;
+                if (prevMonth < 0) {
+                    prevMonth = 11;
+                    prevYear--;
+                }
+                
+                // Get bills from previous month
+                const prevMonthBills = bills.filter(bill => {
+                    const billDate = new Date(bill.dueDate);
+                    return billDate.getMonth() === prevMonth && billDate.getFullYear() === prevYear;
+                });
+                
+                // Copy bills to current month
+                prevMonthBills.forEach(bill => {
+                    // Create a new bill object with updated due date
+                    const oldDate = new Date(bill.dueDate);
+                    const newDate = new Date(selectedYear, selectedMonth, oldDate.getDate());
+                    
+                    const newBill = {
+                        id: Date.now() + Math.random(), // Ensure unique ID
+                        name: bill.name,
+                        amount: bill.totalDue || 0,
+                        dueDate: formatDateForInput(newDate),
+                        category: bill.category,
+                        customCategory: bill.customCategory,
+                        accountOwner: bill.accountOwner,
+                        amountBeforeTax: bill.amountBeforeTax,
+                        totalDue: bill.totalDue,
+                        cardDigits: bill.cardDigits,
+                        status: 'Unpaid', // Reset status to unpaid
+                        notes: bill.notes
+                    };
+                    
+                    // Add to bills array
+                    bills.push(newBill);
+                });
+                
+                // Save to localStorage
+                localStorage.setItem('bills', JSON.stringify(bills));
+                
+                // Update UI
+                updateCalendar();
+                updateUI();
+                
+                showToast(`Copied ${prevMonthBills.length} bills from ${getMonthName(prevMonth)}.`);
+            }
+            
+            // Initialize month selectors
+            document.querySelectorAll('.month-selector').forEach(monthEl => {
+                monthEl.addEventListener('click', function() {
+                    const month = parseInt(this.getAttribute('data-month'));
+                    selectedMonth = month;
+                    
+                    // Update active class
+                    document.querySelectorAll('.month-selector').forEach(el => {
+                        el.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    // Update calendar
+                    updateCalendar();
+                    // Update UI to filter by selected month
+                    updateUI();
+                });
+            });
+            
+            // Set current month as active
+            document.querySelector(`.month-selector[data-month="${selectedMonth}"]`).classList.add('active');
+            
+            // Add bill form submission
+            document.getElementById('bill-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Get form values
+                const billId = document.getElementById('bill-id').value;
+                const name = document.getElementById('bill-name').value;
+                const totalDue = parseFloat(document.getElementById('bill-total-due').value);
+                const dueDate = document.getElementById('bill-due-date').value;
+                const category = document.getElementById('bill-category').value;
+                let finalCategory = category;
+                let customCategoryValue = '';
+                
+                // Handle custom category
+                if (category === 'Other') {
+                    customCategoryValue = document.getElementById('custom-category').value;
+                    if (customCategoryValue) {
+                        finalCategory = customCategoryValue;
+                    }
+                }
+                
+                const accountOwner = document.getElementById('bill-account-owner').value;
+                const amountBeforeTax = document.getElementById('bill-amount-before-tax').value ? 
+                    parseFloat(document.getElementById('bill-amount-before-tax').value) : '';
+                const cardDigits = document.getElementById('bill-card-digits').value;
+                const status = document.getElementById('bill-status').value;
+                const notes = document.getElementById('bill-notes').value;
+                
+                // Create form data object
+                const formData = {
+                    name,
+                    description: name,
+                    amount: totalDue,
+                    dueDate,
+                    category: finalCategory,
+                    customCategory: category === 'Other' ? customCategoryValue : '',
+                    accountOwner,
+                    amountBeforeTax,
+                    beforeTax: amountBeforeTax,
+                    totalDue,
+                    totalAmount: totalDue,
+                    cardDigits,
+                    cardLast4: cardDigits,
+                    status,
+                    notes
+                };
+                
+                if (isEditMode && billId) {
+                    // Update existing bill
+                    const billIndex = bills.findIndex(bill => bill.id === parseInt(billId));
+                    if (billIndex !== -1) {
+                        bills[billIndex] = {
+                            ...bills[billIndex],
+                            ...formData
+                        };
+                        showToast('Bill updated successfully');
+                    }
+                } else {
+                    // Add new bill
+                    const newBill = {
+                        id: Date.now(),
+                        ...formData
+                    };
+                    bills.push(newBill);
+                    showToast('Bill added successfully');
+                }
+                
+                // Save to localStorage
+                localStorage.setItem('bills', JSON.stringify(bills));
+                
+                // Update UI
+                updateUI();
+                
+                // Update calendar if it's visible
+                if (calendarView.style.display === 'block') {
+                    updateCalendar();
+                }
+                
+                // Close modal
+                closeModal();
+            });
+            
+            // Filter by category
+            document.getElementById('filter-category').addEventListener('change', function() {
+                updateUI();
+            });
+            
+            // Filter by status
+            document.getElementById('filter-status').addEventListener('change', function() {
+                updateUI();
+            });
+            
+            // Sort by amount
+            document.getElementById('sort-amount').addEventListener('click', function() {
+                bills.sort((a, b) => b.amount - a.amount);
+                updateUI();
+            });
+            
+            // Sort by date
+            document.getElementById('sort-date').addEventListener('click', function() {
+                bills.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+                updateUI();
+            });
+            
+            // Function to update the calendar
+            function updateCalendar() {
+                const calendarDays = document.getElementById('calendar-days');
+                const monthYearLabel = document.getElementById('calendar-month-year');
+                
+                // Clear calendar
+                calendarDays.innerHTML = '';
+                
+                // Update month/year label
+                monthYearLabel.textContent = `${getMonthName(selectedMonth)} ${selectedYear}`;
+                
+                // Get first day of month and number of days
+                const firstDay = new Date(selectedYear, selectedMonth, 1).getDay();
+                const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+                
+                // Add empty cells for days before first day of month
+                for (let i = 0; i < firstDay; i++) {
+                    const emptyDay = document.createElement('div');
+                    calendarDays.appendChild(emptyDay);
+                }
+                
+                // Add days of month
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dayEl = document.createElement('div');
+                    dayEl.className = 'calendar-day';
+                    dayEl.textContent = day;
+                    
+                    // Check if this day has bills
+                    const dateStr = formatDateForInput(new Date(selectedYear, selectedMonth, day));
+                    const dayBills = bills.filter(bill => bill.dueDate === dateStr);
+                    
+                    if (dayBills.length > 0) {
+                        dayEl.classList.add('has-bill');
+                        
+                        // Check bill statuses
+                        const hasPaidBills = dayBills.some(bill => bill.status === 'Paid');
+                        const hasUnpaidBills = dayBills.some(bill => bill.status === 'Unpaid');
+                        
+                        // Check for due soon bills
+                        const hasDueSoonBills = dayBills.some(bill => {
+                            if (bill.status === 'Unpaid') {
+                                const dueDate = new Date(bill.dueDate);
+                                const today = new Date();
+                                const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                                const dueDateNoTime = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+                                const diffTime = dueDateNoTime - todayDate;
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                return diffDays <= 3 && diffDays >= 0;
+                            }
+                            return false;
+                        });
+                        
+                        // Apply appropriate class based on bill statuses
+                        if (hasPaidBills && hasUnpaidBills) {
+                            dayEl.classList.add('has-mixed-bills');
+                        } else if (hasPaidBills) {
+                            dayEl.classList.add('has-paid-bill');
+                        } else if (hasDueSoonBills) {
+                            dayEl.classList.add('has-due-soon-bill');
+                        } else if (hasUnpaidBills) {
+                            dayEl.classList.add('has-unpaid-bill');
+                        }
+                    }
+                    
+                    // Check if this is today
+                    if (today.getFullYear() === selectedYear && today.getMonth() === selectedMonth && today.getDate() === day) {
+                        dayEl.classList.add('today');
+                    }
+                    
+                    // Check if this is selected date
+                    if (selectedDate && selectedDate.getFullYear() === selectedYear && 
+                        selectedDate.getMonth() === selectedMonth && selectedDate.getDate() === day) {
+                        dayEl.classList.add('selected');
+                    }
+                    
+                    // Add click event
+                    dayEl.addEventListener('click', function() {
+                        // Remove selected class from all days
+                        document.querySelectorAll('.calendar-day').forEach(el => {
+                            el.classList.remove('selected');
+                        });
+                        
+                        // Add selected class to this day
+                        this.classList.add('selected');
+                        
+                        // Set selected date
+                        selectedDate = new Date(selectedYear, selectedMonth, day);
+                        
+                        // Update UI to filter by selected date
+                        updateUI(true);
+                    });
+                    
+                    calendarDays.appendChild(dayEl);
+                }
+            }
+            
+            // Function to edit a bill
+            function editExpense(id) {
+                const expense = bills.find(e => e.id === id);
+                
+                if (expense) {
+                    isEditMode = true;
+                    document.getElementById('modal-title').textContent = 'Edit Bill';
+                    document.getElementById('bill-id').value = expense.id;
+                    document.getElementById('bill-name').value = expense.description || expense.name;
+                    document.getElementById('bill-category').value = expense.category;
+                    document.getElementById('bill-due-date').value = expense.dueDate;
+                    document.getElementById('bill-account-owner').value = expense.accountOwner || '';
+                    document.getElementById('bill-amount-before-tax').value = expense.beforeTax || expense.amountBeforeTax || '';
+                    document.getElementById('bill-total-due').value = expense.totalAmount || expense.totalDue || expense.amount;
+                    document.getElementById('bill-card-digits').value = expense.cardLast4 || expense.cardDigits || '';
+                    document.getElementById('bill-status').value = expense.status;
+                    document.getElementById('bill-notes').value = expense.notes || '';
+                    
+                    // Handle custom category
+                    if (expense.customCategory) {
+                        document.getElementById('bill-category').value = 'Other';
+                        document.getElementById('custom-category').value = expense.customCategory;
+                        document.getElementById('custom-category').style.display = 'block';
+                    } else {
+                        document.getElementById('custom-category').style.display = 'none';
+                    }
+                    
+                    // Update button text
+                    saveBillBtn.textContent = 'Save Changes';
+                    
+                    // Show modal
+                    modal.style.display = 'block';
+                }
+            }
+            
+            // Function to show toast notification
+            function showToast(message, type = 'success') {
+                const toast = document.getElementById('toast');
+                const toastIcon = document.getElementById('toast-icon');
+                const toastMessage = document.getElementById('toast-message');
+                
+                toastMessage.textContent = message;
+                
+                if (type === 'success') {
+                    toast.classList.remove('bg-red-600');
+                    toast.classList.add('bg-gray-800');
+                    toastIcon.className = 'fas fa-check-circle mr-2';
+                } else {
+                    toast.classList.remove('bg-gray-800');
+                    toast.classList.add('bg-red-600');
+                    toastIcon.className = 'fas fa-exclamation-circle mr-2';
+                }
+                
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                
+                setTimeout(() => {
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            }
+            
+            // Function to update the UI
+            function updateUI(filterBySelectedDate = false) {
+                const billsContainer = document.getElementById('bills-container');
+                const noBillsMessage = document.getElementById('no-bills-message');
+                const filterCategory = document.getElementById('filter-category').value;
+                const filterStatus = document.getElementById('filter-status').value;
+                
+                // Filter bills
+                let filteredBills = bills;
+                
+                // Filter by selected month
+                filteredBills = filteredBills.filter(bill => {
+                    const billDate = new Date(bill.dueDate);
+                    return billDate.getMonth() === selectedMonth && billDate.getFullYear() === selectedYear;
+                });
+                
+                // Filter by selected date if needed
+                if (filterBySelectedDate && selectedDate) {
+                    filteredBills = filteredBills.filter(bill => {
+                        const billDate = new Date(bill.dueDate);
+                        return billDate.getDate() === selectedDate.getDate() && 
+                               billDate.getMonth() === selectedDate.getMonth() && 
+                               billDate.getFullYear() === selectedDate.getFullYear();
+                    });
+                }
+                
+                // Filter by category if needed
+                if (filterCategory !== 'all') {
+                    filteredBills = filteredBills.filter(bill => bill.category === filterCategory);
+                }
+                
+                // Filter by status if needed
+                if (filterStatus !== 'all') {
+                    filteredBills = filteredBills.filter(bill => bill.status === filterStatus);
+                }
+                
+                // Clear bills container
+                billsContainer.innerHTML = '';
+                
+                // Show or hide no bills message
+                if (filteredBills.length === 0) {
+                    noBillsMessage.style.display = 'block';
+                    billsContainer.appendChild(noBillsMessage);
+                } else {
+                    noBillsMessage.style.display = 'none';
+                    
+                    // Add bill cards
+                    filteredBills.forEach(bill => {
+                        const billCard = document.createElement('div');
+                        billCard.className = 'bill-card bg-white border border-gray-200 rounded-lg shadow-sm p-3 hover:shadow-md transition-shadow';
+                        billCard.dataset.id = bill.id;
+                        
+                        // Get category color
+                        const categoryColor = getCategoryColor(bill.category);
+                        
+                        // Format card digits display
+                        const cardDisplay = bill.cardDigits || bill.cardLast4 ? `•••• ${bill.cardDigits || bill.cardLast4}` : '';
+                        
+                        // Determine due date status
+                        const dueDate = new Date(bill.dueDate);
+                        const today = new Date();
+                        
+                        // Create a date object with the current date but set hours to 0 for accurate day comparison
+                        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                        const dueDateNoTime = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+                        
+                        const diffTime = dueDateNoTime - todayDate;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        let dueDateClass = '';
+                        let dueDateText = '';
+                        let reminderIcon = '';
+                        
+                        // If bill is paid, always show green regardless of due date
+                        if (bill.status === 'Paid') {
+                            dueDateClass = 'paid';
+                            dueDateText = 'Paid';
+                        } else if (diffDays < 0) {
+                            dueDateClass = 'overdue';
+                            dueDateText = `Overdue by ${Math.abs(diffDays)} days`;
+                        } else if (diffDays <= 3 && diffDays > 0) {
+                            dueDateClass = 'due-soon';
+                            dueDateText = `Due in ${diffDays} days`;
+                            reminderIcon = `<span class="reminder-icon">Due Soon!</span>`;
+                        } else if (diffDays === 0) {
+                            dueDateClass = 'due-soon';
+                            dueDateText = 'Due Today';
+                            reminderIcon = `<span class="reminder-icon">Due Today!</span>`;
+                        } else {
+                            dueDateText = `Due in ${diffDays} days`;
+                        }
+                        
+                        // Create meta info with notes included
+                        let metaInfo = '';
+                        if (bill.accountOwner) {
+                            metaInfo += `<span class="meta-info text-gray-500">Owner: ${bill.accountOwner}</span>`;
+                        }
+                        if (cardDisplay) {
+                            metaInfo += `<span class="meta-info text-gray-500">Card: ${cardDisplay}</span>`;
+                        }
+                        if (bill.notes) {
+                            metaInfo += `<span class="bill-notes">${bill.notes}</span>`;
+                        }
+                        
+                        billCard.innerHTML = `
+                            <div class="bill-header">
+                                <div class="flex items-center">
+                                    <span class="category-badge inline-block px-2 py-1 text-xs font-medium rounded-full mr-2" 
+                                          style="background-color: ${categoryColor}20; color: ${categoryColor}">
+                                        ${bill.category}
+                                    </span>
+                                    <span class="status-badge ${bill.status === 'Paid' ? 'status-paid' : 'status-unpaid'}">${bill.status}</span>
+                                </div>
+                                <div class="due-date-badge ${dueDateClass}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+                                    </svg>
+                                    ${formatDate(bill.dueDate)} - ${dueDateText} ${reminderIcon}
+                                </div>
+                            </div>
+                            <div class="bill-content">
+                                <h3 class="bill-name">${bill.name || bill.description}</h3>
+                                <div class="bill-amount">$${(bill.totalAmount || bill.totalDue || bill.amount).toFixed(2)}</div>
+                            </div>
+                            <div class="bill-footer">
+                                <div class="bill-meta">
+                                    ${metaInfo}
+                                </div>
+                                <div class="bill-actions">
+                                    <button class="toggle-status bill-action-btn text-blue-500 hover:text-blue-700" data-id="${bill.id}">
+                                        ${bill.status === 'Paid' ? 'Mark Unpaid' : 'Mark Paid'}
+                                    </button>
+                                    <button class="edit-expense bill-action-btn text-green-500 hover:text-green-700" data-id="${bill.id}">
+                                        Edit
+                                    </button>
+                                    <button class="delete-expense bill-action-btn text-red-500 hover:text-red-700" data-id="${bill.id}">
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        billsContainer.appendChild(billCard);
+                    });
+                    
+                    // Add event listeners to buttons
+                    addEventListenersToBillButtons();
+                }
+                
+                // Update summary statistics
+                updateSummary();
+            }
+            
+            // Function to add event listeners to bill buttons
+            function addEventListenersToBillButtons() {
+                // Add event listeners to delete buttons
+                document.querySelectorAll('.delete-expense').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = parseInt(this.getAttribute('data-id'));
+                        confirmDelete(id);
+                    });
+                });
+                
+                // Add event listeners to toggle status buttons
+                document.querySelectorAll('.toggle-status').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = parseInt(this.getAttribute('data-id'));
+                        toggleExpenseStatus(id);
+                    });
+                });
+                
+                // Add event listeners to edit buttons
+                document.querySelectorAll('.edit-expense').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = parseInt(this.getAttribute('data-id'));
+                        editExpense(id);
+                    });
+                });
+            }
+            
+            // Function to update summary statistics
+            function updateSummary() {
+                const totalAmount = bills.reduce((sum, bill) => sum + (parseFloat(bill.totalDue) || parseFloat(bill.totalAmount) || parseFloat(bill.amount) || 0), 0);
+                const unpaidAmount = bills
+                    .filter(bill => bill.status === 'Unpaid')
+                    .reduce((sum, bill) => sum + (parseFloat(bill.totalDue) || parseFloat(bill.totalAmount) || parseFloat(bill.amount) || 0), 0);
+                
+                // Calculate monthly totals
+                const monthlyBills = bills.filter(bill => {
+                    const billDate = new Date(bill.dueDate);
+                    return billDate.getMonth() === selectedMonth && billDate.getFullYear() === selectedYear;
+                });
+                
+                const totalDueMonth = monthlyBills.reduce((sum, bill) => sum + (parseFloat(bill.totalDue) || parseFloat(bill.totalAmount) || parseFloat(bill.amount) || 0), 0);
+                const totalPaidMonth = monthlyBills
+                    .filter(bill => bill.status === 'Paid')
+                    .reduce((sum, bill) => sum + (parseFloat(bill.totalDue) || parseFloat(bill.totalAmount) || parseFloat(bill.amount) || 0), 0);
+                
+                document.getElementById('total-amount').textContent = totalAmount.toFixed(2);
+                document.getElementById('unpaid-amount').textContent = unpaidAmount.toFixed(2);
+                document.getElementById('total-entries').textContent = bills.length;
+                document.getElementById('total-due-month').textContent = `$${totalDueMonth.toFixed(2)}`;
+                document.getElementById('total-paid-month').textContent = `$${totalPaidMonth.toFixed(2)}`;
+            }
+            
+            // Function to toggle expense status
+            function toggleExpenseStatus(id) {
+                const billIndex = bills.findIndex(bill => bill.id === id);
+                
+                if (billIndex !== -1) {
+                    bills[billIndex].status = bills[billIndex].status === 'Paid' ? 'Unpaid' : 'Paid';
+                    localStorage.setItem('bills', JSON.stringify(bills));
+                    updateUI();
+                    
+                    // Update calendar if it's visible
+                    if (calendarView.style.display === 'block') {
+                        updateCalendar();
+                    }
+                    
+                    showToast(bills[billIndex].status === 'Paid' ? 'Marked as paid' : 'Marked as unpaid');
+                }
+            }
+            
+            // Function to confirm delete
+            function confirmDelete(id) {
+                const bill = bills.find(bill => bill.id === id);
+                
+                if (bill) {
+                    state.billToDeleteId = id;
+                    document.getElementById('confirm-message').textContent = `Are you sure you want to delete "${bill.name || bill.description}"?`;
+                    confirmModal.classList.remove('hidden');
+                }
+            }
+            
+            // Helper function to format date for display
+            function formatDate(dateString) {
+                const options = { month: 'short', day: 'numeric', timeZone: 'America/Denver' }; // Mountain Time
+                return new Date(dateString).toLocaleDateString(undefined, options);
+            }
+            
+            // Helper function to format date for input (YYYY-MM-DD)
+            function formatDateForInput(date) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+            
+            // Helper function to get month name
+            function getMonthName(monthIndex) {
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                return monthNames[monthIndex];
+            }
+            
+            // Helper function to get category color
+            function getCategoryColor(category) {
+                const colors = {
+                    'Housing': '#2196F3',
+                    'Credit Card': '#F44336',
+                    'Medical': '#3F51B5',
+                    'Productivity': '#009688',
+                    'Digital Storage': '#607D8B',
+                    'Insurance': '#9C27B0',
+                    'Utilities-Internet': '#00BCD4',
+                    'Credit': '#FF5722',
+                    'Entertainment': '#FF9800',
+                    'Utilities-Phone': '#03A9F4',
+                    'Debt': '#E91E63',
+                    'Food': '#4CAF50',
+                    'Transportation': '#795548',
+                    'Subscriptions': '#FFC107',
+                    'Education': '#673AB7',
+                    'Childcare': '#8BC34A',
+                    'Other': '#607D8B'
+                };
+                
+                return colors[category] || '#607D8B';
+            }
+            
+            // Initialize UI
+            updateUI();
+            
+            // Make sure calendar is hidden by default
+            calendarView.style.display = 'none';
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'94358b5443c51f3c',t:'MTc0Nzg0NTkyNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><iframe height="1" width="1" style="position: absolute; top: 0px; left: 0px; border: none; visibility: hidden;"></iframe>
+</body>
+</html>
